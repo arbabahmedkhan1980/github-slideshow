@@ -2,3 +2,14 @@ _site/
 .sass-cache/
 .jekyll-metadata
 .bundle
+.next/
+node_modules/
+coverage/
+dist/
+.turbo/
+.env
+.env.*
+!.env.example
+uploads/
+*.log
+/.vscode/
