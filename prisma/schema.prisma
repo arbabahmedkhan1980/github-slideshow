@@ -1,0 +1,216 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SpecTier {
+  LOW
+  LUXURY
+  ULTRA
+  SMART
+}
+
+enum AreaCategory {
+  CONCRETE_BASE
+  LGS_AND_BOARD
+  MEP_FIRST_FIX
+  FLOOR_TILE
+  WALL_TILE
+  WALL_SOLID_SURFACE
+  PAINT
+  GLASS_PARTITION
+  MEP_SECOND_FIX_LABOUR
+  LED_STRIP
+}
+
+enum SkuCategory {
+  WC
+  SHOWER_SET
+  BASIN_MIXER
+  BASIN
+  TOWEL_RAIL
+  ACCESSORIES_SET
+  VANITY_600_SINGLE
+  VANITY_900_SINGLE
+  VANITY_1200_DOUBLE
+  MIRROR_SMALL
+  MIRROR_MEDIUM
+  MIRROR_FULL
+  CEILING_LIGHT
+  FAN_COIL
+  SPECIAL
+}
+
+model Project {
+  id               String               @id @default(cuid())
+  name             String
+  clientName       String?
+  code             String?              @unique
+  description      String?
+  defaultHeightMm  Int                  @default(2600)
+  rateProfileId    String?
+  rateProfile      RateProfile?         @relation(fields: [rateProfileId], references: [id])
+  floors           Floor[]
+  planFiles        PlanFile[]
+  bathroomInstances BathroomInstance[]
+  bathroomTypes    BathroomType[]
+  costSnapshots    ProjectCostSnapshot[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+}
+
+model Floor {
+  id              String              @id @default(cuid())
+  name            String
+  level           Int?
+  defaultHeightMm Int?
+  projectId       String
+  project         Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  planFiles       PlanFile[]
+  bathroomInstances BathroomInstance[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+}
+
+model PlanFile {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  floorId     String?
+  floor       Floor?   @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  filename    String
+  storagePath String
+  mimeType    String
+  pageCount   Int?
+  uploadedBy  String?
+  uploadedAt  DateTime @default(now())
+  bathroomInstances BathroomInstance[]
+}
+
+model BathroomInstance {
+  id             String          @id @default(cuid())
+  label          String?
+  lengthMm       Int
+  widthMm        Int
+  heightMm       Int
+  projectId      String
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  floorId        String?
+  floor          Floor?          @relation(fields: [floorId], references: [id], onDelete: SetNull)
+  bathroomTypeId String?
+  bathroomType   BathroomType?   @relation(fields: [bathroomTypeId], references: [id], onDelete: SetNull)
+  sourceFileId   String?
+  sourceFile     PlanFile?       @relation(fields: [sourceFileId], references: [id], onDelete: SetNull)
+  pageNumber     Int?
+  bbox           Json?
+  detectedBy     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model BathroomType {
+  id               String                    @id @default(cuid())
+  name             String
+  lengthMm         Int
+  widthMm          Int
+  heightMm         Int
+  toleranceMm      Int                       @default(50)
+  instanceCount    Int                       @default(0)
+  floorAreaSqft    Float
+  wallAreaSqft     Float
+  ceilingAreaSqft  Float
+  projectId        String
+  project          Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  bathroomInstances BathroomInstance[]
+  config           BathroomTypeSpec?
+  costSnapshots    BathroomTypeCostSnapshot[]
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+}
+
+model BathroomTypeSpec {
+  id               String          @id @default(cuid())
+  bathroomTypeId   String          @unique
+  bathroomType     BathroomType    @relation(fields: [bathroomTypeId], references: [id], onDelete: Cascade)
+  rateProfileId    String?
+  rateProfile      RateProfile?    @relation(fields: [rateProfileId], references: [id])
+  structureConfig  Json?
+  wallFinishes     Json?
+  secondFixItems   Json?
+  glassConfig      Json?
+  vanityConfig     Json?
+  lightingConfig   Json?
+  mirrorConfig     Json?
+  overrides        Json?
+  overheadMargin   Float           @default(0.1)
+  notes            String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model BathroomTypeCostSnapshot {
+  id              String         @id @default(cuid())
+  bathroomTypeId  String
+  bathroomType    BathroomType   @relation(fields: [bathroomTypeId], references: [id], onDelete: Cascade)
+  rateProfileId   String?
+  rateProfile     RateProfile?   @relation(fields: [rateProfileId], references: [id])
+  costPerPod      Float
+  costPerSqft     Float
+  totalCost       Float
+  breakdown       Json
+  createdAt       DateTime       @default(now())
+}
+
+model ProjectCostSnapshot {
+  id         String    @id @default(cuid())
+  projectId  String
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  totalCost  Float
+  currency   String    @default("AED")
+  summary    Json
+  createdAt  DateTime  @default(now())
+}
+
+model RateProfile {
+  id          String        @id @default(cuid())
+  name        String
+  region      String?
+  currency    String        @default("AED")
+  description String?
+  isDefault   Boolean       @default(false)
+  areaRates   AreaRate[]
+  skuItems    SkuItem[]
+  projects    Project[]
+  specs       BathroomTypeSpec[]
+  typeSnapshots BathroomTypeCostSnapshot[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model AreaRate {
+  id             String       @id @default(cuid())
+  rateProfileId  String
+  rateProfile    RateProfile  @relation(fields: [rateProfileId], references: [id], onDelete: Cascade)
+  category       AreaCategory
+  tier           SpecTier?
+  ratePerSqft    Float
+  metadata       Json?
+
+  @@unique([rateProfileId, category, tier])
+}
+
+model SkuItem {
+  id             String       @id @default(cuid())
+  rateProfileId  String
+  rateProfile    RateProfile  @relation(fields: [rateProfileId], references: [id], onDelete: Cascade)
+  category       SkuCategory
+  tier           SpecTier?
+  unitPrice      Float
+  metadata       Json?
+
+  @@unique([rateProfileId, category, tier])
+}
